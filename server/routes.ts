@@ -4,16 +4,47 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { openaiService } from "./services/openaiService";
 import { emailService } from "./services/emailService";
-import { insertFileSchema, insertEmailTemplateSchema, insertEmailCampaignSchema, insertChatMessageSchema } from "@shared/schema";
+import { 
+  insertFileSchema, 
+  insertEmailTemplateSchema, 
+  insertEmailCampaignSchema, 
+  insertChatMessageSchema,
+  fileStatusUpdateSchema,
+  userRoleUpdateSchema,
+  emailValidationSchema,
+  bulkEmailSchema
+} from "@shared/schema";
 import multer from "multer";
 import path from "path";
 
-// Configure multer for file uploads
+// Configure multer for file uploads with security restrictions
 const upload = multer({
   dest: 'uploads/',
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB limit
   },
+  fileFilter: (req, file, cb) => {
+    // Whitelist of allowed MIME types
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png', 
+      'image/gif',
+      'image/webp',
+      'application/pdf',
+      'text/plain',
+      'text/csv',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+    
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type ${file.mimetype} not allowed. Allowed types: ${allowedTypes.join(', ')}`));
+    }
+  }
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -142,8 +173,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { id } = req.params;
-      const { status } = req.body;
       
+      // Validate status with Zod
+      const validationResult = fileStatusUpdateSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid status", 
+          errors: validationResult.error.errors 
+        });
+      }
+      
+      const { status } = validationResult.data;
       const updatedFile = await storage.updateFileStatus(id, status, req.user.claims.sub);
       res.json(updatedFile);
     } catch (error) {
@@ -211,12 +251,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/email/validate', isAuthenticated, async (req, res) => {
     try {
-      const { emails } = req.body;
-      
-      if (!emails || !Array.isArray(emails)) {
-        return res.status(400).json({ message: "Valid email array is required" });
+      // Validate emails with Zod
+      const validationResult = emailValidationSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid email format", 
+          errors: validationResult.error.errors 
+        });
       }
 
+      const { emails } = validationResult.data;
       const validationResults = await emailService.validateEmails(emails);
       res.json(validationResults);
     } catch (error) {
@@ -232,16 +276,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Admin access required" });
       }
 
+      // Validate email data with Zod
+      const emailValidationResult = bulkEmailSchema.safeParse(req.body);
+      if (!emailValidationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid email data", 
+          errors: emailValidationResult.error.errors 
+        });
+      }
+
       const { campaignId } = req.body;
+      const { emails, subject, content, fromEmail } = emailValidationResult.data;
       
-      // This would integrate with email service for actual sending
-      // For now, we'll update the campaign status
+      if (!campaignId) {
+        return res.status(400).json({ message: "Campaign ID is required" });
+      }
+
+      // Update campaign status to sending
       await storage.updateEmailCampaignStats(campaignId, { status: 'sending' });
       
-      res.json({ message: "Campaign sending initiated" });
+      try {
+        // Send emails using SendGrid
+        const results = await emailService.sendBulkEmails(emails, subject, content, fromEmail);
+        
+        // Update campaign with results
+        await storage.updateEmailCampaignStats(campaignId, {
+          status: results.failed === 0 ? 'completed' : 'partially_completed',
+          sentCount: results.sent,
+          // Note: We'd need to add these fields to the schema for full tracking
+        });
+
+        res.json({
+          message: "Campaign completed",
+          results: {
+            sent: results.sent,
+            failed: results.failed,
+            errors: results.errors
+          }
+        });
+      } catch (error: any) {
+        // Update campaign status to failed
+        await storage.updateEmailCampaignStats(campaignId, { status: 'failed' });
+        
+        console.error("Email sending error:", error);
+        res.status(500).json({ 
+          message: "Failed to send emails", 
+          error: error.message 
+        });
+      }
     } catch (error) {
       console.error("Error sending campaign:", error);
       res.status(500).json({ message: "Failed to send campaign" });
+    }
+  });
+
+  // Add bulk email sending endpoint for direct sending (not campaign-based)
+  app.post('/api/email/send-bulk', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Validate bulk email data with Zod
+      const validationResult = bulkEmailSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid email data", 
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const { emails, subject, content, fromEmail } = validationResult.data;
+      const results = await emailService.sendBulkEmails(emails, subject, content, fromEmail);
+      
+      res.json({
+        message: "Bulk email sending completed",
+        results: {
+          sent: results.sent,
+          failed: results.failed,
+          errors: results.errors
+        }
+      });
+    } catch (error: any) {
+      console.error("Bulk email sending error:", error);
+      res.status(500).json({ 
+        message: "Failed to send bulk emails", 
+        error: error.message 
+      });
     }
   });
 
@@ -253,11 +375,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Admin access required" });
       }
 
-      // This would be implemented with proper user listing
-      res.json({ message: "User management endpoint" });
+      const users = await storage.getAllUsers();
+      res.json(users);
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.patch('/api/admin/users/:userId/role', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { userId } = req.params;
+      
+      // Validate role with Zod
+      const validationResult = userRoleUpdateSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid role", 
+          errors: validationResult.error.errors 
+        });
+      }
+      
+      const { role } = validationResult.data;
+      const updatedUser = await storage.updateUserRole(userId, role);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ message: "Failed to update user role" });
     }
   });
 

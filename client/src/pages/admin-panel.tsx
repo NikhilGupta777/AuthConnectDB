@@ -10,6 +10,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Clock, 
   UserPlus, 
@@ -54,6 +55,44 @@ export default function AdminPanel() {
   const { data: files = [], isLoading: filesLoading } = useQuery({
     queryKey: ["/api/files"],
     retry: false,
+  });
+
+  const { data: users = [], isLoading: usersLoading } = useQuery({
+    queryKey: ["/api/admin/users"],
+    retry: false,
+  });
+
+  const updateUserRole = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      const response = await apiRequest("PATCH", `/api/admin/users/${userId}/role`, { role });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "User role updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to update user role",
+        variant: "destructive",
+      });
+    },
   });
 
   const updateFileStatus = useMutation({
@@ -265,12 +304,82 @@ export default function AdminPanel() {
                     </tr>
                   </thead>
                   <tbody className="text-muted-foreground">
-                    {/* Empty state */}
-                    <tr>
-                      <td colSpan={6} className="text-center py-8 text-muted-foreground">
-                        Member management functionality coming soon
-                      </td>
-                    </tr>
+                    {usersLoading ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-8 text-muted-foreground">
+                          Loading users...
+                        </td>
+                      </tr>
+                    ) : users.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No users found
+                        </td>
+                      </tr>
+                    ) : (
+                      users.map((user: any) => (
+                        <tr key={user.id} className="border-b border-border/50">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-3">
+                              <img 
+                                src={user.profileImageUrl || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=40&h=40"}
+                                alt={user.firstName}
+                                className="h-8 w-8 rounded-full object-cover"
+                              />
+                              <div>
+                                <p className="font-medium text-foreground">{user.firstName} {user.lastName}</p>
+                                <p className="text-xs text-muted-foreground">ID: {user.id}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">{user.email}</td>
+                          <td className="py-3 px-4">
+                            <Select 
+                              value={user.role} 
+                              onValueChange={(role) => updateUserRole.mutate({ userId: user.id, role })}
+                              disabled={updateUserRole.isPending}
+                            >
+                              <SelectTrigger className="w-32 bg-muted/30 border-input">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="member">Member</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="py-3 px-4">
+                            {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
+                          </td>
+                          <td className="py-3 px-4">
+                            <Badge variant="outline" className="text-green-400 border-green-400/40">
+                              Active
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2 border-blue-500/40 text-blue-400 hover:bg-blue-500/10"
+                                data-testid={`button-edit-user-${user.id}`}
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2 border-red-500/40 text-red-400 hover:bg-red-500/10"
+                                data-testid={`button-remove-user-${user.id}`}
+                                disabled={false}
+                              >
+                                <Ban className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

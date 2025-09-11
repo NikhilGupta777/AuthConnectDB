@@ -117,3 +117,23 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
   id: true,
   createdAt: true,
 });
+
+// Additional validation schemas for route parameters
+export const fileStatusUpdateSchema = z.object({
+  status: z.enum(['pending', 'approved', 'rejected']),
+});
+
+export const userRoleUpdateSchema = z.object({
+  role: z.enum(['member', 'admin']),
+});
+
+export const emailValidationSchema = z.object({
+  emails: z.array(z.string().email()).min(1, "At least one email is required"),
+});
+
+export const bulkEmailSchema = z.object({
+  emails: z.array(z.string().email()).min(1, "At least one email is required"),
+  subject: z.string().min(1, "Subject is required"),
+  content: z.string().min(1, "Content is required"),
+  fromEmail: z.string().email().optional(),
+});

@@ -18,8 +18,17 @@ export default function NSSpace() {
   const [campaignData, setCampaignData] = useState({
     name: "",
     subject: "",
+    content: "",
+    fromEmail: "noreply@narayani-sena.com",
     recipients: "all",
     schedule: "now"
+  });
+  
+  const [bulkEmailData, setBulkEmailData] = useState({
+    emails: "",
+    subject: "",
+    content: "",
+    fromEmail: "noreply@narayani-sena.com"
   });
   
   const { toast } = useToast();
@@ -135,19 +144,92 @@ export default function NSSpace() {
   };
 
   const handleCreateCampaign = () => {
-    if (!campaignData.name || !campaignData.subject) {
+    if (!campaignData.name || !campaignData.subject || !campaignData.content) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "Please fill in all required fields (name, subject, and content)",
         variant: "destructive",
       });
       return;
     }
 
+    const recipientCount = campaignData.recipients === 'all' ? 1000 : 
+                          campaignData.recipients === 'active' ? 892 : 
+                          campaignData.recipients === 'admins' ? 5 : 100;
+
     createCampaign.mutate({
       ...campaignData,
-      content: "Campaign content here", // This would come from a rich text editor
-      recipientCount: 1000, // This would be calculated based on recipient selection
+      recipientCount,
+    });
+  };
+  
+  // Add bulk email sending mutation
+  const sendBulkEmail = useMutation({
+    mutationFn: async (data: { emails: string[]; subject: string; content: string; fromEmail: string }) => {
+      const response = await apiRequest("POST", "/api/email/send-bulk", data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Bulk Email Sent",
+        description: `Successfully sent ${data.results.sent} emails${data.results.failed > 0 ? `, ${data.results.failed} failed` : ''}`,
+        variant: "default",
+      });
+      setBulkEmailData({
+        emails: "",
+        subject: "",
+        content: "",
+        fromEmail: "noreply@narayani-sena.com"
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => window.location.href = "/api/login", 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to send bulk emails. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSendBulkEmail = () => {
+    if (!bulkEmailData.emails.trim() || !bulkEmailData.subject || !bulkEmailData.content) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields: emails, subject, and content",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Parse emails
+    const emails = bulkEmailData.emails
+      .split(/[,\n\r]+/)
+      .map(email => email.trim())
+      .filter(email => email.length > 0);
+
+    if (emails.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please enter valid email addresses",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    sendBulkEmail.mutate({
+      emails,
+      subject: bulkEmailData.subject,
+      content: bulkEmailData.content,
+      fromEmail: bulkEmailData.fromEmail
     });
   };
 
@@ -282,25 +364,24 @@ export default function NSSpace() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-foreground mb-2 block">Email Integration</label>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        className="flex-1 border-red-500/40 text-red-400 hover:bg-red-500/10"
-                        data-testid="button-gmail-integration"
-                      >
-                        <Mail className="h-4 w-4 mr-2" />
-                        Gmail
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        className="flex-1 border-blue-500/40 text-blue-400 hover:bg-blue-500/10"
-                        data-testid="button-outlook-integration"
-                      >
-                        <Mail className="h-4 w-4 mr-2" />
-                        Outlook
-                      </Button>
-                    </div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">From Email</label>
+                    <Input
+                      value={campaignData.fromEmail}
+                      onChange={(e) => setCampaignData(prev => ({ ...prev, fromEmail: e.target.value }))}
+                      placeholder="noreply@narayani-sena.com"
+                      className="bg-muted/30 border-input"
+                      data-testid="input-from-email"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">Email Content</label>
+                    <Textarea
+                      value={campaignData.content}
+                      onChange={(e) => setCampaignData(prev => ({ ...prev, content: e.target.value }))}
+                      placeholder="Enter your email content here..."
+                      className="w-full h-32 bg-muted/30 border-input resize-none"
+                      data-testid="textarea-campaign-content"
+                    />
                   </div>
                 </div>
                 <div className="space-y-4">
@@ -339,6 +420,69 @@ export default function NSSpace() {
                   >
                     <Rocket className="h-4 w-4 mr-2" />
                     {createCampaign.isPending ? "Creating..." : "Launch Campaign"}
+                  </Button>
+                </div>
+              </div>
+            </GlassCard>
+
+            {/* Direct Bulk Email Sending */}
+            <GlassCard className="p-6">
+              <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+                <Mail className="h-5 w-5 text-green-400 mr-2" />
+                Send Bulk Emails Directly
+              </h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">Email List</label>
+                    <Textarea
+                      value={bulkEmailData.emails}
+                      onChange={(e) => setBulkEmailData(prev => ({ ...prev, emails: e.target.value }))}
+                      placeholder="Enter email addresses (one per line or comma separated)&#10;example@domain.com,&#10;another@domain.com"
+                      className="w-full h-32 bg-muted/30 border-input resize-none"
+                      data-testid="textarea-bulk-emails"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">From Email</label>
+                    <Input
+                      value={bulkEmailData.fromEmail}
+                      onChange={(e) => setBulkEmailData(prev => ({ ...prev, fromEmail: e.target.value }))}
+                      placeholder="noreply@narayani-sena.com"
+                      className="bg-muted/30 border-input"
+                      data-testid="input-bulk-from-email"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">Subject</label>
+                    <Input
+                      value={bulkEmailData.subject}
+                      onChange={(e) => setBulkEmailData(prev => ({ ...prev, subject: e.target.value }))}
+                      placeholder="Enter email subject"
+                      className="bg-muted/30 border-input"
+                      data-testid="input-bulk-subject"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">Email Content</label>
+                    <Textarea
+                      value={bulkEmailData.content}
+                      onChange={(e) => setBulkEmailData(prev => ({ ...prev, content: e.target.value }))}
+                      placeholder="Enter your email content here..."
+                      className="w-full h-32 bg-muted/30 border-input resize-none"
+                      data-testid="textarea-bulk-content"
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleSendBulkEmail}
+                    disabled={sendBulkEmail.isPending || !bulkEmailData.emails.trim() || !bulkEmailData.subject || !bulkEmailData.content}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    data-testid="button-send-bulk-email"
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    {sendBulkEmail.isPending ? "Sending..." : "Send Bulk Emails"}
                   </Button>
                 </div>
               </div>
