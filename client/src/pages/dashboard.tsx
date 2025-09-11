@@ -9,6 +9,13 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { ToolCard } from "@/components/ui/tool-card";
 import { Users, Clock, NotebookPen, Activity } from "lucide-react";
 
+type DashboardStats = {
+  totalMembers: number;
+  pendingContent: number;
+  emailsSent: number;
+  activeProjects: number;
+};
+
 export default function Dashboard() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
@@ -28,7 +35,7 @@ export default function Dashboard() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
     retry: false,
   });

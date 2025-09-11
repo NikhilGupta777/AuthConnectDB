@@ -10,13 +10,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Bot, User, Send } from "lucide-react";
-
-interface ChatMessage {
-  id: string;
-  message: string;
-  response: string;
-  createdAt: string;
-}
+import type { ChatMessage } from "@shared/schema";
 
 export default function AskAnything() {
   const [currentMessage, setCurrentMessage] = useState("");
@@ -38,7 +32,7 @@ export default function AskAnything() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: messages = [], refetch } = useQuery({
+  const { data: messages = [], refetch } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chat/messages"],
     retry: false,
   });
