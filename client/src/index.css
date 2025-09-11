@@ -1,0 +1,235 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Core theme colors */
+  --ns-bg: hsl(222, 84%, 5%);
+  --ns-card: hsla(222, 47%, 11%, 0.55);
+  --ns-stroke: hsla(239, 84%, 67%, 0.35);
+  --ns-ring: 0 0 0 2px hsla(239, 84%, 67%, 0.55), 0 0 0 4px hsla(239, 84%, 67%, 0.20);
+  
+  /* Shadcn color system */
+  --background: hsl(222, 84%, 5%);
+  --foreground: hsl(210, 40%, 98%);
+  --card: hsla(222, 47%, 11%, 0.55);
+  --card-foreground: hsl(210, 40%, 98%);
+  --popover: hsl(222, 84%, 5%);
+  --popover-foreground: hsl(210, 40%, 98%);
+  --primary: hsl(239, 84%, 67%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(217, 33%, 17%);
+  --secondary-foreground: hsl(210, 40%, 98%);
+  --muted: hsl(215, 28%, 17%);
+  --muted-foreground: hsl(217, 11%, 65%);
+  --accent: hsl(217, 33%, 17%);
+  --accent-foreground: hsl(210, 40%, 98%);
+  --destructive: hsl(0, 63%, 31%);
+  --destructive-foreground: hsl(210, 40%, 98%);
+  --border: hsla(239, 84%, 67%, 0.18);
+  --input: hsla(239, 84%, 67%, 0.18);
+  --ring: hsla(239, 84%, 67%, 0.55);
+  --radius: 0.75rem;
+  
+  /* Custom fonts */
+  --font-sans: 'Inter', sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: Menlo, monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--ns-bg);
+  color: var(--foreground);
+  overflow: hidden;
+}
+
+/* Background effects */
+.bg-noise {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, hsla(239, 84%, 67%, 0.15), transparent 55%),
+    radial-gradient(1000px 500px at -10% 80%, hsla(199, 89%, 48%, 0.12), transparent 60%),
+    linear-gradient(180deg, hsla(222, 84%, 5%, 0.2), hsla(222, 84%, 5%, 0.6));
+}
+
+.bg-grid {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(hsla(239, 84%, 67%, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, hsla(239, 84%, 67%, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: radial-gradient(80% 60% at 50% 40%, #000 60%, transparent 100%);
+}
+
+.top-hairline {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  z-index: 40;
+  background: linear-gradient(90deg, #22d3ee, #6366f1, #a78bfa, #22d3ee);
+  background-size: 200% 100%;
+  animation: barflow 8s linear infinite;
+  opacity: 0.75;
+}
+
+@keyframes barflow {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* Glass effects */
+.glass {
+  background: var(--ns-card);
+  backdrop-filter: blur(22px) saturate(120%);
+  -webkit-backdrop-filter: blur(22px) saturate(120%);
+  border: 1px solid var(--border);
+}
+
+/* Tool card effects */
+.tool {
+  position: relative;
+  border: 1px solid hsla(217, 33%, 17%, 0.6);
+  background: linear-gradient(180deg, hsla(222, 47%, 11%, 0.75), hsla(222, 84%, 5%, 0.75));
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  transform-style: preserve-3d;
+  will-change: transform, box-shadow;
+  overflow: hidden;
+}
+
+.tool:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+  box-shadow: 0 20px 60px hsla(222, 84%, 5%, 0.45), inset 0 0 0 1px hsla(239, 84%, 67%, 0.25);
+}
+
+.tool::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, hsla(239, 84%, 67%, 0.4), hsla(199, 89%, 48%, 0.25), hsla(271, 75%, 66%, 0.25));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(300px 180px at var(--mx, 50%) var(--my, 50%), hsla(239, 84%, 67%, 0.20), transparent 60%);
+  transition: opacity 0.2s ease;
+}
+
+.tool:hover .glow {
+  opacity: 1;
+}
+
+/* Icon animations */
+.icon-pulse {
+  animation: ip 3s ease-in-out infinite;
+}
+
+@keyframes ip {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+/* Shimmer text effect */
+.shimmer {
+  background: linear-gradient(90deg, #a5b4fc, #f9fafb, #a5b4fc);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shim 3s linear infinite;
+}
+
+@keyframes shim {
+  to {
+    background-position: -200% center;
+  }
+}
+
+/* Focus rings */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: var(--ns-ring);
+}
+
+/* Sidebar specific styles */
+.sidebar-link.active {
+  background: hsla(239, 84%, 67%, 0.15);
+  border-color: var(--primary);
+}
+
+/* Modal backdrop */
+.modal-backdrop {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: hsla(217, 33%, 17%, 0.3);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsla(239, 84%, 67%, 0.4);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsla(239, 84%, 67%, 0.6);
+}
+
+/* Accessibility - reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .tool,
+  .glow,
+  .icon-pulse,
+  .shimmer {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
