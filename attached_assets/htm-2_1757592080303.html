@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Narayani Sena — Command Center</title>
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet" />
+
+    <!-- Alpine (defer) -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <style>
+        :root {
+            --ns-bg: #030712;
+            --ns-card: rgba(15, 23, 42, 0.55);
+            --ns-stroke: rgba(99, 102, 241, 0.35);
+            --ns-ring: 0 0 0 2px rgba(99, 102, 241, .55), 0 0 0 4px rgba(99, 102, 241, .20);
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--ns-bg);
+            color: #e5e7eb;
+            overflow: hidden;
+            /* Outer scroll locked; inner main scrolls */
+        }
+
+        /* --- Subtle procedural texture + grid overlay --- */
+        .bg-noise {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background:
+                radial-gradient(1200px 600px at 80% -10%, rgba(79, 70, 229, .15), transparent 55%),
+                radial-gradient(1000px 500px at -10% 80%, rgba(14, 165, 233, .12), transparent 60%),
+                linear-gradient(180deg, rgba(2, 6, 23, .2), rgba(2, 6, 23, .6));
+            /* pixel noise */
+            mix-blend-mode: normal;
+        }
+
+        .bg-grid {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background-image:
+                linear-gradient(rgba(99, 102, 241, .08) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(99, 102, 241, .08) 1px, transparent 1px);
+            background-size: 24px 24px;
+            mask-image: radial-gradient(80% 60% at 50% 40%, #000 60%, transparent 100%);
+        }
+
+        /* --- Top gradient hairline --- */
+        .top-hairline {
+            position: fixed;
+            inset: 0 0 auto 0;
+            height: 2px;
+            z-index: 40;
+            background: linear-gradient(90deg, #22d3ee, #6366f1, #a78bfa, #22d3ee);
+            background-size: 200% 100%;
+            animation: barflow 8s linear infinite;
+            opacity: .75;
+        }
+
+        @keyframes barflow {
+            to {
+                background-position: -200% 0;
+            }
+        }
+
+        /* --- Glass card --- */
+        .glass {
+            background: var(--ns-card);
+            backdrop-filter: blur(22px) saturate(120%);
+            -webkit-backdrop-filter: blur(22px) saturate(120%);
+            border: 1px solid rgba(99, 102, 241, .18);
+        }
+
+        /* --- Tool card effects --- */
+        .tool {
+            position: relative;
+            border: 1px solid rgba(55, 65, 81, .6);
+            background: linear-gradient(180deg, rgba(15, 23, 42, .75), rgba(2, 6, 23, .75));
+            transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+            transform-style: preserve-3d;
+            will-change: transform, box-shadow;
+            overflow: hidden;
+        }
+
+        .tool:hover {
+            transform: translateY(-2px);
+            border-color: #6366f1;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, .45), inset 0 0 0 1px rgba(99, 102, 241, .25);
+        }
+
+        .tool::before {
+            content: "";
+            position: absolute;
+            inset: -1px;
+            border-radius: inherit;
+            padding: 1px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, .4), rgba(14, 165, 233, .25), rgba(168, 85, 247, .25));
+            -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            opacity: .55;
+            pointer-events: none;
+        }
+
+        .glow {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0;
+            background: radial-gradient(300px 180px at var(--mx, 50%) var(--my, 50%), rgba(99, 102, 241, .20), transparent 60%);
+            transition: opacity .2s ease;
+        }
+
+        .tool:hover .glow {
+            opacity: 1;
+        }
+
+        /* --- Icon pulse --- */
+        .icon-pulse {
+            animation: ip 3s ease-in-out infinite;
+        }
+
+        @keyframes ip {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: .9
+            }
+
+            50% {
+                transform: scale(1.06);
+                opacity: 1
+            }
+        }
+
+        /* --- Shimmer text --- */
+        .shimmer {
+            background: linear-gradient(90deg, #a5b4fc, #f9fafb, #a5b4fc);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shim 3s linear infinite;
+        }
+
+        @keyframes shim {
+            to {
+                background-position: -200% center;
+            }
+        }
+
+        /* --- Accessible focus ring --- */
+        .focus-ring:focus-visible {
+            outline: none;
+            box-shadow: var(--ns-ring);
+        }
+
+        /* Reduce motion for sensitive users */
+        @media (prefers-reduced-motion: reduce) {
+
+            .tool,
+            .glow,
+            .icon-pulse,
+            .shimmer {
+                animation: none !important;
+                transition: none !important;
+            }
+        }
+
+        [x-cloak] {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body x-data="{ sidebarOpen: true }" class="h-screen w-full flex selection:bg-indigo-500/20">
+
+    <div class="top-hairline"></div>
+    <div class="bg-noise"></div>
+    <div class="bg-grid"></div>
+
+    <!-- Sidebar -->
+    <aside class="z-30 glass h-full flex-shrink-0 flex flex-col transition-all duration-300"
+        :class="sidebarOpen ? 'w-72' : 'w-20'">
+
+        <!-- Brand -->
+        <div class="h-16 px-4 flex items-center justify-between border-b border-indigo-500/20">
+            <div class="flex items-center gap-3">
+                <div class="h-9 w-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 grid place-items-center">
+                    <span class="text-indigo-300 font-bold">NS</span>
+                </div>
+                <h1 class="text-lg font-extrabold tracking-wide shimmer"
+                    :class="sidebarOpen ? 'opacity-100' : 'opacity-0'">NARAYANI SENA</h1>
+            </div>
+            <button @click="sidebarOpen = !sidebarOpen" class="p-2 rounded-md hover:bg-white/5 focus-ring"
+                :aria-label="sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'"
+                :aria-expanded="sidebarOpen.toString()">
+                <svg class="h-6 w-6 text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- Nav -->
+        <nav class="flex-1 p-2 space-y-1 overflow-y-auto">
+            <!-- item -->
+            <a href="#" class="group flex items-center gap-3 p-3 rounded-lg transition-colors focus-ring sidebar-link"
+                :class="sidebarOpen ? 'justify-start' : 'justify-center'" title="Dashboard">
+                <div
+                    class="h-9 w-9 grid place-items-center rounded-md bg-white/5 border border-white/10 group-hover:border-indigo-400/40">
+                    <svg class="h-5 w-5 text-indigo-300" xmlns="http://www.w3.org/2000/svg" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M4 6h4v4H4V6zm6 0h4v4h-4V6zM4 12h4v4H4v-4zm6 0h4v4h-4v-4z" />
+                    </svg>
+                </div>
+                <span class="text-sm font-medium transition-opacity"
+                    :class="sidebarOpen ? 'opacity-100' : 'opacity-0'">Dashboard</span>
+            </a>
+
+            <a href="/ask"
+                class="group flex items-center gap-3 p-3 rounded-lg text-gray-300 hover:bg-indigo-500/10 hover:text-white focus-ring"
+                :class="sidebarOpen ? 'justify-start' : 'justify-center'" title="Ask Anything">
+                <div
+                    class="h-9 w-9 grid place-items-center rounded-md bg-white/5 border border-white/10 group-hover:border-indigo-400/40">
+                    <svg class="h-5 w-5 text-sky-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <span :class="sidebarOpen ? 'opacity-100' : 'opacity-0'" class="text-sm font-medium">Ask Anything</span>
+            </a>
+
+            <a href="/email"
+                class="group flex items-center gap-3 p-3 rounded-lg text-gray-300 hover:bg-indigo-500/10 hover:text-white focus-ring"
+                :class="sidebarOpen ? 'justify-start' : 'justify-center'" title="NS Space (Email)">
+                <div
+                    class="h-9 w-9 grid place-items-center rounded-md bg-white/5 border border-white/10 group-hover:border-indigo-400/40">
+                    <svg class="h-5 w-5 text-emerald-300" xmlns="http://www.w3.org/2000/svg" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16v12H4zM4 6l8 6 8-6" />
+                    </svg>
+                </div>
+                <span :class="sidebarOpen ? 'opacity-100' : 'opacity-0'" class="text-sm font-medium">NS Space</span>
+            </a>
+
+            <a href="/image"
+                class="group flex items-center gap-3 p-3 rounded-lg text-gray-300 hover:bg-indigo-500/10 hover:text-white focus-ring"
+                :class="sidebarOpen ? 'justify-start' : 'justify-center'" title="AI in ONE">
+                <div
+                    class="h-9 w-9 grid place-items-center rounded-md bg-white/5 border border-white/10 group-hover:border-indigo-400/40">
+                    <svg class="h-5 w-5 text-purple-300" xmlns="http://www.w3.org/2000/svg" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M8 7h8m-8 4h8m-8 4h5M5 7h.01M5 11h.01M5 15h.01" />
+                    </svg>
+                </div>
+                <span :class="sidebarOpen ? 'opacity-100' : 'opacity-0'" class="text-sm font-medium">AI in ONE</span>
+            </a>
+        </nav>
+
+        <!-- Footer mini -->
+        <div class="p-3 border-t border-indigo-500/20">
+            <div class="text-[11px] text-gray-400" :class="sidebarOpen ? 'block' : 'hidden'">
+                © <span x-text="new Date().getFullYear()"></span> Narayani Sena
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="relative z-10 flex-1 flex flex-col overflow-hidden">
+        <!-- Header -->
+        <header class="h-16 glass flex items-center justify-between px-6 border-b border-indigo-500/20">
+            <div>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-wide shimmer">Narayani Sena</h2>
+                <p class="text-xs md:text-sm text-indigo-300/90">A Workspace for Mahaprabhuji Devotees</p>
+            </div>
+
+            <!-- Profile dropdown -->
+            <div x-data="{ open:false }" class="relative">
+                <button @click="open = !open" @keydown.escape.window="open = false"
+                    class="focus-ring rounded-full bg-white/5 hover:bg-white/10 p-1.5">
+                    <img class="h-9 w-9 rounded-full object-cover"
+                        src="https://placehold.co/100x100/4f46e5/f9fafb?text=N" alt="User avatar" />
+                </button>
+                <div x-cloak x-show="open" x-transition.origin.top.right @click.outside="open=false"
+                    class="absolute right-0 mt-2 w-56 glass rounded-xl shadow-xl border border-white/10">
+                    <div class="p-3 border-b border-white/10">
+                        <p class="text-sm font-semibold text-white">Narayani Sevak</p>
+                        <p class="text-xs text-gray-400">sevak@narayani.sena</p>
+                    </div>
+                    <nav class="py-1">
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-200 hover:bg-white/5">My Profile</a>
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-200 hover:bg-white/5">Settings</a>
+                        <div class="my-1 border-t border-white/10"></div>
+                        <a href="#" class="block px-4 py-2 text-sm text-red-400 hover:bg-red-500/10">Log Out</a>
+                    </nav>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content -->
+        <main class="flex-1 overflow-y-auto">
+            <!-- Page container -->
+            <div class="mx-auto w-full max-w-7xl px-6 py-8 md:py-10">
+                <!-- Page intro -->
+                <div class="mb-6 md:mb-8">
+                    <div
+                        class="inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-400/10 px-3 py-1 text-[11px] uppercase tracking-wide text-indigo-200">
+                        Command Center
+                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    </div>
+                    <h3 class="mt-3 text-2xl md:text-3xl font-extrabold text-white">Welcome, Sevak.</h3>
+                    <p class="mt-1.5 text-sm text-gray-300/90 max-w-2xl">
+                        Launch tools faster, with clarity and bhāva. Hover a card to feel the glow; press <kbd
+                            class="px-1.5 py-0.5 border border-white/20 rounded text-xs">Tab</kbd> to navigate.
+                    </p>
+                </div>
+
+                <!-- Tools grid -->
+                <section x-data="{
+            tilt(e) {
+              const el = e.currentTarget;
+              const r = el.getBoundingClientRect();
+              const x = e.clientX - r.left, y = e.clientY - r.top;
+              el.style.setProperty('--mx', x + 'px');
+              el.style.setProperty('--my', y + 'px');
+              const rx = (y / r.height - .5) * -8;
+              const ry = (x / r.width  - .5) *  8;
+              el.style.transform = `perspective(1000px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-2px)`;
+            },
+            reset(e){ e.currentTarget.style.transform = 'perspective(1000px) rotateX(0) rotateY(0)'; }
+          }" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+
+                    <!-- Ask Anything -->
+                    <a href="/ask" @mousemove="tilt" @mouseleave="reset"
+                        class="tool rounded-2xl p-6 md:p-7 focus-ring block">
+                        <div class="glow"></div>
+                        <div class="flex items-start gap-4">
+                            <div
+                                class="h-12 w-12 rounded-xl bg-sky-500/15 border border-sky-500/40 grid place-items-center icon-pulse">
+                                <svg class="h-7 w-7 text-sky-300" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <h4 class="text-lg font-bold text-white">Ask Anything</h4>
+                                    <span
+                                        class="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-300">#devspeed</span>
+                                </div>
+                                <p class="mt-1 text-sm text-gray-300/90">Conversational AI for code, content, and
+                                    research.</p>
+                                <ul class="mt-3 flex flex-wrap gap-2 text-[11px] text-gray-300/80">
+                                    <li class="px-2 py-1 rounded bg-white/5 border border-white/10">Code Explain</li>
+                                    <li class="px-2 py-1 rounded bg-white/5 border border-white/10">Refactor</li>
+                                    <li class="px-2 py-1 rounded bg-white/5 border border-white/10">Sanskrit/Hindi</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="mt-5 flex items-center justify-between">
+                            <span class="text-xs text-gray-400">Hotkey: <kbd
+                                    class="px-1 py-0.5 border border-white/20 rounded">/</kbd></span>
+                            <span class="inline-flex items-center gap-2 text-indigo-200">
+                                Launch
+                                <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </span>
+                        </div>
+                    </a>
+
+                    <!-- NS Space -->
+                    <a href="/email" @mousemove="tilt" @mouseleave="reset"
+                        class="tool rounded-2xl p-6 md:p-7 focus-ring block">
+                        <div class="glow"></div>
+                        <div class="flex items-start gap-4">
+                            <div
+                                class="h-12 w-12 rounded-xl bg-emerald-500/15 border border-emerald-500/40 grid place-items-center icon-pulse">
+                                <svg class="h-7 w-7 text-emerald-300" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 6h16v12H4zM4 6l8 6 8-6" />
+                                </svg>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <h4 class="text-lg font-bold text-white">NS Space</h4>
+                                    <span
+                                        class="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-300">#automation</span>
+                                </div>
+                                <p class="mt-1 text-sm text-gray-300/90">Email fetching, parsing, and workflows.</p>
+                                <ul class="mt-3 flex flex-wrap gap-2 text-[11px] text-gray-300/80">
+                                    <li class="px-2 py-1 rounded bg-white/5 border border-white/10">Smart Inbox</li>
+                                    <li class="px-2 py-1 rounded bg-white/5 border border-white/10">Summaries</li>
+                                    <li class="px-2 py-1 rounded bg-white/5 border border-white/10">Exports</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="mt-5 flex items-center justify-between">
+                            <span class="text-xs text-gray-400">OAuth ready</span>
+                            <span class="inline-flex items-center gap-2 text-indigo-200">Launch
+                                <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </span>
+                        </div>
+                    </a>
+
+                    <!-- AI in ONE -->
+                    <a href="/image" @mousemove="tilt" @mouseleave="reset"
+                        class="tool rounded-2xl p-6 md:p-7 focus-ring block">
+                        <div class="glow"></div>
+                        <div class="flex items-start gap-4">
+                            <div
+                                class="h-12 w-12 rounded-xl bg-purple-500/15 border border-purple-500/40 grid place-items-center icon-pulse">
+                                <svg class="h-7 w-7 text-purple-300" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M3 7h18M5 7l7 8 7-8M5 19h14" />
+                                </svg>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <h4 class="text-lg font-bold text-white">AI in ONE</h4>
+                                    <span
+                                        class="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-300">#creative</span>
+                                </div>
+                                <p class="mt-1 text-sm text-gray-300/90">Generate images, videos & more from prompts.
+                                </p>
+                                <ul class="mt-3 flex flex-wrap gap-2 text-[11px] text-gray-300/80">
+                                    <li class="px-2 py-1 rounded bg-white/5 border border-white/10">Upscale</li>
+                                    <li class="px-2 py-1 rounded bg-white/5 border border-white/10">Variations</li>
+                                    <li class="px-2 py-1 rounded bg-white/5 border border-white/10">Batch</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="mt-5 flex items-center justify-between">
+                            <span class="text-xs text-gray-400">GPU optimized</span>
+                            <span class="inline-flex items-center gap-2 text-indigo-200">Launch
+                                <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </span>
+                        </div>
+                    </a>
+
+                </section>
+            </div>
+        </main>
+    </div>
+</body>
+
+</html>
